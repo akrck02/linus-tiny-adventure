@@ -35,4 +35,3 @@ signal button_level_focus(button : LevelButton)
 # UI signals
 signal ui_show_settings
 signal ui_camera_filter_changed(filter : String)
-

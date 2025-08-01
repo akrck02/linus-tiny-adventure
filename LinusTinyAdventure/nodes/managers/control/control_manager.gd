@@ -23,4 +23,3 @@ func check_controls(_device,_connected):
 func is_gamepad_connected():
 	var gamepad = Input.get_joy_name(0)
 	return gamepad != ""
-

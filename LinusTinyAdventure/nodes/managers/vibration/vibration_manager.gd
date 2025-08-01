@@ -8,4 +8,3 @@ const SHORT_STRONG : float = 0.2
 
 func vibrate(weak : float = SHORT_WEAK, strong : float = SHORT_STRONG, duration : float = DEFAULT_DURATION):
 	Input.start_joy_vibration(DEFAULT_DEVICE, weak, strong, duration)
-
