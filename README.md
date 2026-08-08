@@ -15,4 +15,4 @@ public so anyone can use it as a reference.
 ## ℹ️ On use of AI ℹ️
 
 Claude was only used to create a automatic pipeline to compile windows / linux / macOS versions of the game on push to the main branch.
-No assets, code, music or design were added
+No assets, code, music or design were added by any AI model.
