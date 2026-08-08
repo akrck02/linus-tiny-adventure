@@ -1,6 +1,0 @@
-[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://bb2o6blednwk"]
-
-[ext_resource type="Shader" path="res://nodes/ui/options/shaders/transparency/transparent.gdshader" id="1_aisem"]
-
-[resource]
-shader = ExtResource("1_aisem")

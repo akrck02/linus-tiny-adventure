@@ -1,8 +1,0 @@
-[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://b86fr6brsha8"]
-
-[ext_resource type="Shader" path="res://nodes/ui/options/shaders/scanlines/scanlines.gdshader" id="1_5hq3r"]
-
-[resource]
-shader = ExtResource("1_5hq3r")
-shader_parameter/scan_line_count = 236.0
-shader_parameter/is_grayscale = false

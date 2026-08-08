@@ -1,6 +1,0 @@
-[gd_resource type="Theme" load_steps=2 format=3 uid="uid://dsvnmw0f3ety"]
-
-[ext_resource type="FontFile" uid="uid://bjf25rcjkkxlh" path="res://fonts/DotGothic16-Regular.ttf" id="1_5yyum"]
-
-[resource]
-default_font = ExtResource("1_5yyum")

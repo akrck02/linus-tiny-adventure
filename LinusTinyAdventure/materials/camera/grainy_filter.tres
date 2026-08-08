@@ -1,8 +1,0 @@
-[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://cxyou28gleytg"]
-
-[ext_resource type="Shader" path="res://nodes/ui/options/shaders/grainy/grainy.gdshader" id="1_nt6mg"]
-
-[resource]
-shader = ExtResource("1_nt6mg")
-shader_parameter/scan_line_count = 100021.0
-shader_parameter/is_grayscale = false

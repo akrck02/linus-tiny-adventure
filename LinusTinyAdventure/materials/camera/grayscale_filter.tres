@@ -1,7 +1,0 @@
-[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://p1jccucjgy"]
-
-[ext_resource type="Shader" path="res://nodes/ui/options/shaders/grayscale/grayscale.gdshader" id="1_66cgb"]
-
-[resource]
-shader = ExtResource("1_66cgb")
-shader_parameter/intensity = 3.184

@@ -1,6 +1,0 @@
-[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://cbuofnciq7u5q"]
-
-[ext_resource type="Shader" path="res://nodes/ui/options/shaders/cozy/cozy.gdshader" id="1_ibfcj"]
-
-[resource]
-shader = ExtResource("1_ibfcj")

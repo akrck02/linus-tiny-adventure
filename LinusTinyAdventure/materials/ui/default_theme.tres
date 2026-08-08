@@ -1,7 +1,0 @@
-[gd_resource type="Theme" load_steps=2 format=3 uid="uid://ea3c2pcwief3"]
-
-[ext_resource type="FontFile" uid="uid://846l31wlf0as" path="res://fonts/Early GameBoy.ttf" id="1_tlfoy"]
-
-[resource]
-default_font = ExtResource("1_tlfoy")
-/colors/AAC5B9 = Color(0.666667, 0.772549, 0.72549, 1)
