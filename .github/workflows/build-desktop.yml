@@ -1,4 +1,4 @@
-name: Deploy Web to GitHub Pages
+name: Build Desktop
 
 on:
   push:
@@ -7,25 +7,34 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# Allow one concurrent deployment, cancel in-progress runs
 concurrency:
-  group: pages
+  group: build-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   GODOT_VERSION: 4.2-stable
   PROJECT_DIR: LinusTinyAdventure
-  EXPORT_DIR: LinusTinyAdventure/export
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows
+            preset: Windows Desktop
+            out: dist/windows
+            artifact: linus-tiny-adventure-windows
+          - target: linux
+            preset: Linux
+            out: dist/linux
+            artifact: linus-tiny-adventure-linux
+          - target: macos
+            preset: macOS
+            out: dist/macos
+            artifact: linus-tiny-adventure-macos
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,7 +50,6 @@ jobs:
           sudo mv Godot_v${GODOT_VERSION}_linux.x86_64 /usr/local/bin/godot
           sudo chmod +x /usr/local/bin/godot
 
-          # Install export templates where Godot 4.2 expects them
           unzip -q templates.tpz
           TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/4.2.stable"
           mkdir -p "$TEMPLATE_DIR"
@@ -50,31 +58,26 @@ jobs:
       - name: Import project assets and build class cache
         working-directory: ${{ env.PROJECT_DIR }}
         # Godot 4.2 has no --import flag; opening the editor headless triggers
-        # resource import AND regenerates .godot/global_script_class_cache.cfg
-        # (needed so class_name identifiers like Constants/Direction resolve).
-        # Run twice: first pass imports, second resolves cross-script class refs.
+        # resource import and regenerates .godot/global_script_class_cache.cfg.
         run: |
           godot --headless --editor --quit-after 1000 || true
           godot --headless --editor --quit-after 1000 || true
           test -f .godot/global_script_class_cache.cfg
 
-      - name: Export Web build
+      - name: Export ${{ matrix.target }}
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           set -euo pipefail
-          mkdir -p export
-          godot --headless --export-release "Web" export/index.html
-          test -f export/index.html
-          test -f export/coi-serviceworker.js  # cross-origin isolation shim (required on Pages)
+          mkdir -p "${{ matrix.out }}"
+          # Preset's export_path (in export_presets.cfg) is used when no path is given.
+          godot --headless --export-release "${{ matrix.preset }}"
+          ls -la "${{ matrix.out }}"
+          # Fail the job if nothing landed in the output dir.
+          test -n "$(ls -A '${{ matrix.out }}')"
 
-      - name: Add .nojekyll (stop Pages from stripping files)
-        run: touch "${EXPORT_DIR}/.nojekyll"
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload ${{ matrix.target }} artifact
+        uses: actions/upload-artifact@v4
         with:
-          path: ${{ env.EXPORT_DIR }}
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          name: ${{ matrix.artifact }}
+          path: ${{ env.PROJECT_DIR }}/${{ matrix.out }}/
+          if-no-files-found: error
