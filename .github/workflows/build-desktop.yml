@@ -3,10 +3,11 @@ name: Build Desktop
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write  # needed by the release job to create/upload a Release
 
 concurrency:
   group: build-${{ github.ref }}
@@ -81,3 +82,35 @@ jobs:
           name: ${{ matrix.artifact }}
           path: ${{ env.PROJECT_DIR }}/${{ matrix.out }}/
           if-no-files-found: error
+
+  release:
+    # Only when pushing a version tag like v1.0.1
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: linus-tiny-adventure-*
+          path: artifacts
+
+      - name: Package each platform into a versioned zip
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          cd artifacts
+          for dir in linus-tiny-adventure-*; do
+            platform="${dir#linus-tiny-adventure-}"
+            zip -r -j "../release/linus-tiny-adventure-${GITHUB_REF_NAME}-${platform}.zip" "$dir"
+          done
+          ls -la ../release
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: release/*.zip
