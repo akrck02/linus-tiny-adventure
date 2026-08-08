@@ -47,12 +47,16 @@ jobs:
           mkdir -p "$TEMPLATE_DIR"
           mv templates/* "$TEMPLATE_DIR/"
 
-      - name: Import project assets
+      - name: Import project assets and build class cache
         working-directory: ${{ env.PROJECT_DIR }}
-        # First import can exit non-zero even on success; run twice and never fail the job here.
+        # Godot 4.2 has no --import flag; opening the editor headless triggers
+        # resource import AND regenerates .godot/global_script_class_cache.cfg
+        # (needed so class_name identifiers like Constants/Direction resolve).
+        # Run twice: first pass imports, second resolves cross-script class refs.
         run: |
-          godot --headless --import . || true
-          godot --headless --import . || true
+          godot --headless --editor --quit-after 1000 || true
+          godot --headless --editor --quit-after 1000 || true
+          test -f .godot/global_script_class_cache.cfg
 
       - name: Export Web build
         working-directory: ${{ env.PROJECT_DIR }}
