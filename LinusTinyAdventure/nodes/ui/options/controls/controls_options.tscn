@@ -16,7 +16,7 @@
 [ext_resource type="Texture2D" uid="uid://6jdktam3xnns" path="res://sprites/ui/controls/keyboard/down_pressed.svg" id="14_m5nqp"]
 [ext_resource type="Texture2D" uid="uid://c0a7081s7c0d" path="res://sprites/ui/controls/keyboard/up.svg" id="15_6q6y1"]
 [ext_resource type="Texture2D" uid="uid://bxu3d82kwd061" path="res://sprites/ui/controls/keyboard/down.svg" id="16_f21td"]
-[ext_resource type="Texture2D" uid="uid://b5hdfihanx8ha" path="res://sprites/ui/option_keyboard_a.svg.svg" id="17_0my3t"]
+[ext_resource type="Texture2D" uid="uid://bkmhl2735kk3i" path="res://sprites/ui/controls/keyboard/left.svg" id="17_0my3t"]
 [ext_resource type="Texture2D" uid="uid://ceyxju0gmh5yf" path="res://sprites/ui/controls/keyboard/right.svg" id="18_uu8s1"]
 [ext_resource type="Texture2D" uid="uid://bpwkll8phj5m2" path="res://sprites/ui/controls/keyboard/reset_level_pressed.svg" id="19_50vro"]
 [ext_resource type="Texture2D" uid="uid://hh6bt6jptj3i" path="res://sprites/ui/controls/keyboard/reset_level.svg" id="20_oxjq0"]

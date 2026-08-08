@@ -46,7 +46,6 @@ texture = SubResource("GradientTexture1D_g285w")
 material = SubResource("ShaderMaterial_ypj13")
 position = Vector2(640, 360)
 scale = Vector2(5, 720)
-texture = SubResource("GradientTexture1D_g285w")
 
 [node name="GraphicOptionsTitle" type="RichTextLabel" parent="."]
 layout_mode = 0

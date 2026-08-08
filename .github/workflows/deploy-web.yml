@@ -1,0 +1,76 @@
+name: Deploy Web to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment, cancel in-progress runs
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.2-stable
+  PROJECT_DIR: LinusTinyAdventure
+  EXPORT_DIR: LinusTinyAdventure/export
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Godot ${{ env.GODOT_VERSION }} (headless) + export templates
+        run: |
+          set -euo pipefail
+          BASE="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}"
+          curl -fsSL -o godot.zip      "${BASE}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          curl -fsSL -o templates.tpz  "${BASE}/Godot_v${GODOT_VERSION}_export_templates.tpz"
+
+          unzip -q godot.zip
+          sudo mv Godot_v${GODOT_VERSION}_linux.x86_64 /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+
+          # Install export templates where Godot 4.2 expects them
+          unzip -q templates.tpz
+          TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/4.2.stable"
+          mkdir -p "$TEMPLATE_DIR"
+          mv templates/* "$TEMPLATE_DIR/"
+
+      - name: Import project assets
+        working-directory: ${{ env.PROJECT_DIR }}
+        # First import can exit non-zero even on success; run twice and never fail the job here.
+        run: |
+          godot --headless --import . || true
+          godot --headless --import . || true
+
+      - name: Export Web build
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+          mkdir -p export
+          godot --headless --export-release "Web" export/index.html
+          test -f export/index.html
+          test -f export/coi-serviceworker.js  # cross-origin isolation shim (required on Pages)
+
+      - name: Add .nojekyll (stop Pages from stripping files)
+        run: touch "${EXPORT_DIR}/.nojekyll"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ env.EXPORT_DIR }}
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
