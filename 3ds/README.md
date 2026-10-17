@@ -44,6 +44,13 @@ buttons and each level's script) and draws a level into a `draw2d` list; `cmd/li
 console's loop. To try every level without playing the ones before:
 `-ldflags="-X main.unlocked=3"`.
 
+## Licenses
+
+The port is under the repository's `LICENSE`. `linus.3dsx` also carries TinyGo, libctru, citro3d,
+newlib and Go modules: their notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), to
+keep next to the `.3dsx`. The font comes from the original project, which does not include its
+license yet (`fonts/OFL.txt` is DotGothic16's).
+
 ## AI disclosure
 
 This port (everything in `3ds/`) was written with Claude, an AI assistant, and is pending human
