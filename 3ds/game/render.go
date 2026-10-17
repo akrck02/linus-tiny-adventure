@@ -31,16 +31,50 @@ var (
 	frameDuration = 0.75 // seconds a frame of an idle animation shows
 )
 
-// Sprites are the game's pictures, each strip cut into its frames.
+// Sprites are the game's pictures, each strip cut into its frames, as made and as the camera
+// filter in use turns them (made the first time a filter is chosen).
 type Sprites struct {
-	frames map[string][]*draw2d.Image
+	base     map[string][]*draw2d.Image
+	frames   map[string][]*draw2d.Image // the filter's
+	filter   Filter
+	variants map[Filter]map[string][]*draw2d.Image
+}
+
+// SetFilter chooses the camera filter the sprites are drawn through.
+func (sprites *Sprites) SetFilter(filter Filter) {
+	sprites.filter = filter
+	if !filter.TurnsColours() {
+		sprites.frames = sprites.base
+		return
+	}
+	if variant, found := sprites.variants[filter]; found {
+		sprites.frames = variant
+		return
+	}
+	variant := map[string][]*draw2d.Image{}
+	for name, frames := range sprites.base {
+		for _, frame := range frames {
+			variant[name] = append(variant[name], draw2d.NewImage(filter.turnPicture(frame.Pixels)))
+		}
+	}
+	sprites.variants[filter] = variant
+	sprites.frames = variant
+}
+
+// Filter is the camera filter the sprites are drawn through.
+func (sprites *Sprites) Filter() Filter { return sprites.filter }
+
+// Frame is a sprite's picture, as the filter draws it.
+func (sprites *Sprites) Frame(name string, index int) *draw2d.Image {
+	return sprites.frame(name, index)
 }
 
 // LoadSprites reads the PNG strips the converter wrote. Lasers get their frames turned for each
 // way they fire, and the heart a copy three times larger, pixel for pixel: the screen draws
 // pictures as they are, so the turning and the scaling are done here.
 func LoadSprites(files fs.FS) (*Sprites, error) {
-	sprites := &Sprites{frames: map[string][]*draw2d.Image{}}
+	sprites := &Sprites{base: map[string][]*draw2d.Image{}, variants: map[Filter]map[string][]*draw2d.Image{}}
+	sprites.frames = sprites.base
 	entries, err := fs.Glob(files, "sprites/*.png")
 	if err != nil {
 		return nil, err
@@ -56,28 +90,39 @@ func LoadSprites(files fs.FS) (*Sprites, error) {
 		}
 		name := strings.TrimSuffix(strings.TrimPrefix(path, "sprites/"), ".png")
 		frames := cutFrames(picture)
+		if strings.HasPrefix(name, "ui-") {
+			frames = []*image.NRGBA{toNRGBA(picture)} // the interface's icons are single pictures
+		}
 		for _, frame := range frames {
-			sprites.frames[name] = append(sprites.frames[name], draw2d.NewImage(frame))
+			sprites.base[name] = append(sprites.base[name], draw2d.NewImage(frame))
 		}
 		switch name {
 		case "laser":
 			for turns, way := range []string{"right", "down", "left"} {
 				for _, frame := range frames {
-					sprites.frames["laser-"+way] = append(sprites.frames["laser-"+way], draw2d.NewImage(turn(frame, turns+1)))
+					sprites.base["laser-"+way] = append(sprites.base["laser-"+way], draw2d.NewImage(turn(frame, turns+1)))
 				}
 			}
 		case "heart":
 			for _, frame := range frames {
-				sprites.frames["heart-3"] = append(sprites.frames["heart-3"], draw2d.NewImage(scale(frame, 3)))
+				sprites.base["heart-3"] = append(sprites.base["heart-3"], draw2d.NewImage(scale(frame, 3)))
 			}
 		case "characters-player":
 			// the player's scene draws it at seven eighths, 14 pixels
 			for index, frame := range frames {
-				sprites.frames[name][index] = draw2d.NewImage(resize(frame, 14, 14, false))
+				sprites.base[name][index] = draw2d.NewImage(resize(frame, 14, 14, false))
 			}
+		case "ui-lock", "ui-option_exit":
+			// drawn five and three times larger than their pixels: back to one
+			times := 5
+			if name == "ui-option_exit" {
+				times = 3
+			}
+			bounds := frames[0].Rect
+			sprites.base[name][0] = draw2d.NewImage(resize(frames[0], bounds.Dx()/times, bounds.Dy()/times, false))
 		case "characters-shadow":
 			// a soft picture of 151 × 150 drawn at a tenth: 16 pixels, averaged
-			sprites.frames[name][0] = draw2d.NewImage(resize(frames[0], 16, 16, true))
+			sprites.base[name][0] = draw2d.NewImage(resize(frames[0], 16, 16, true))
 		}
 	}
 	return sprites, nil
@@ -103,6 +148,17 @@ func cutFrames(picture image.Image) []*image.NRGBA {
 		frames[index] = frame
 	}
 	return frames
+}
+
+func toNRGBA(picture image.Image) *image.NRGBA {
+	bounds := picture.Bounds()
+	result := image.NewNRGBA(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
+	for y := 0; y < bounds.Dy(); y++ {
+		for x := 0; x < bounds.Dx(); x++ {
+			result.Set(x, y, picture.At(bounds.Min.X+x, bounds.Min.Y+y))
+		}
+	}
+	return result
 }
 
 // turn turns a square picture a quarter clockwise, times times.
@@ -224,7 +280,7 @@ func (world *World) bounds() (left, top, right, bottom float64) {
 
 // Draw draws the level as the camera sees it, on a screen of a size.
 func (sprites *Sprites) Draw(list *draw2d.List, world *World, camera *Camera, width, height float64) {
-	list.Rectangle(draw2d.Rect{Width: float32(width), Height: float32(height)}, 0, Background, draw2d.Color{}, 0)
+	list.Rectangle(draw2d.Rect{Width: float32(width), Height: float32(height)}, 0, sprites.filter.Colour(Background), draw2d.Color{}, 0)
 	shakeX, shakeY := world.Shake()
 	originX, originY := math.Round(-camera.X+shakeX), math.Round(-camera.Y+shakeY)
 	at := func(x, y float64) (float32, float32) {
@@ -240,7 +296,7 @@ func (sprites *Sprites) Draw(list *draw2d.List, world *World, camera *Camera, wi
 		if screenX > float32(width) || screenY > float32(height) || screenX+float32(pictureWidth) < 0 || screenY+float32(pictureHeight) < 0 {
 			return
 		}
-		list.Image(picture, draw2d.Rect{X: screenX, Y: screenY, Width: float32(pictureWidth), Height: float32(pictureHeight)}, 0, tint)
+		list.Image(picture, draw2d.Rect{X: screenX, Y: screenY, Width: float32(pictureWidth), Height: float32(pictureHeight)}, 0, sprites.filter.Colour(tint))
 	}
 	white := draw2d.Color{1, 1, 1, 1}
 	for _, tile := range world.Level.Tiles {
@@ -250,7 +306,7 @@ func (sprites *Sprites) Draw(list *draw2d.List, world *World, camera *Camera, wi
 		sprites.drawLabel(list, label, originX, originY)
 	}
 	// what lies on the floor first, then what stands, the player last
-	for _, entity := range world.Entities {
+	for index, entity := range world.Entities {
 		if entity.Gone {
 			continue
 		}
@@ -259,6 +315,8 @@ func (sprites *Sprites) Draw(list *draw2d.List, world *World, camera *Camera, wi
 		case KindTeleport:
 			put(sprites.frame("teleport", animation), x, y, teleportTint)
 			put(sprites.frame("teleport_frame", animation), x, y, white)
+			screenX, screenY := at(x, y)
+			sprites.drawParticles(list, teleportSparks, float64(screenX), float64(screenY), index, world.Clock)
 		case KindButton:
 			frame, tint := animation, buttonColour
 			if entity.Colour != "" {
@@ -293,7 +351,7 @@ func (sprites *Sprites) Draw(list *draw2d.List, world *World, camera *Camera, wi
 	for _, beam := range world.Beams() {
 		sprites.drawBeam(list, beam, originX, originY)
 	}
-	for _, entity := range world.Entities {
+	for index, entity := range world.Entities {
 		if entity.Gone {
 			continue
 		}
@@ -303,6 +361,8 @@ func (sprites *Sprites) Draw(list *draw2d.List, world *World, camera *Camera, wi
 			put(sprites.frame("box", animation), x, y, white)
 		case KindKey:
 			put(sprites.frame("key", animation), x, y, keyTint)
+			screenX, screenY := at(x, y)
+			sprites.drawParticles(list, keySparks, float64(screenX), float64(screenY), index, world.Clock)
 		case KindDoor:
 			put(sprites.frame("door", animation), x, y, doorTint)
 			put(sprites.frame("door_lock", animation), x, y, lockTint)
@@ -344,7 +404,7 @@ func (sprites *Sprites) drawBeam(list *draw2d.List, beam Beam, originX, originY 
 		return
 	}
 	area.X, area.Y = area.X+float32(originX), area.Y+float32(originY)
-	list.Rectangle(area, 0, laserColour, draw2d.Color{}, 0)
+	list.Rectangle(area, 0, sprites.filter.Colour(laserColour), draw2d.Color{}, 0)
 }
 
 // drawLabel writes a text of the world in the game's font, white with a soft shadow.
@@ -356,5 +416,5 @@ func (sprites *Sprites) drawLabel(list *draw2d.List, label Label, originX, origi
 	}
 	baseline := float32(math.Round(label.Y+originY)) + size
 	list.Text(label.Text, x+1, baseline+1, size, draw2d.Regular, labelShadow)
-	list.Text(label.Text, x, baseline, size, draw2d.Regular, labelColour)
+	list.Text(label.Text, x, baseline, size, draw2d.Regular, sprites.filter.Colour(labelColour))
 }

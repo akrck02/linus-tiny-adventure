@@ -37,7 +37,11 @@ func (element *svgElement) number(name string) int {
 }
 
 // rasteriseSVG draws an SVG of rectangles into an image of its own size.
-func rasteriseSVG(path string) (*image.NRGBA, error) {
+func rasteriseSVG(path string) (*image.NRGBA, error) { return rasteriseSVGScaled(path, 1) }
+
+// rasteriseSVGScaled draws it at a fraction of its size: the interface's large icons are pixel art
+// on a grid of ten, drawn at a tenth.
+func rasteriseSVGScaled(path string, scale float64) (*image.NRGBA, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -46,10 +50,11 @@ func rasteriseSVG(path string) (*image.NRGBA, error) {
 	if err := xml.Unmarshal(data, &root); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
-	picture := image.NewNRGBA(image.Rect(0, 0, root.number("width"), root.number("height")))
+	width, height := int(math.Round(float64(root.number("width"))*scale)), int(math.Round(float64(root.number("height"))*scale))
+	picture := image.NewNRGBA(image.Rect(0, 0, width, height))
 	clips := map[string]image.Rectangle{}
 	collectClips(&root, clips)
-	paint(&root, picture, picture.Bounds(), clips)
+	paint(&root, picture, picture.Bounds(), clips, scale)
 	return picture, nil
 }
 
@@ -109,7 +114,7 @@ func transformOf(transform string) [6]float64 {
 }
 
 // paint draws an element's rectangles, cut to the clip in force, and its groups' within theirs.
-func paint(element *svgElement, picture *image.NRGBA, clip image.Rectangle, clips map[string]image.Rectangle) {
+func paint(element *svgElement, picture *image.NRGBA, clip image.Rectangle, clips map[string]image.Rectangle, scale float64) {
 	switch element.XMLName.Local {
 	case "defs", "clipPath":
 		return
@@ -118,8 +123,17 @@ func paint(element *svgElement, picture *image.NRGBA, clip image.Rectangle, clip
 		if fill.A == 0 {
 			return
 		}
-		area := rectangleOf(element).Intersect(clip)
+		area := scaled(rectangleOf(element), scale).Intersect(clip)
 		draw.Draw(picture, area, &image.Uniform{fill}, image.Point{}, draw.Over)
+		return
+	case "path":
+		fill := colourOf(element.attribute("fill"), element.attribute("fill-opacity"))
+		if fill.A == 0 {
+			return
+		}
+		for _, area := range pathRectangles(element.attribute("d")) {
+			draw.Draw(picture, scaled(area, scale).Intersect(clip), &image.Uniform{fill}, image.Point{}, draw.Over)
+		}
 		return
 	}
 	if reference := element.attribute("clip-path"); reference != "" {
@@ -129,8 +143,85 @@ func paint(element *svgElement, picture *image.NRGBA, clip image.Rectangle, clip
 		}
 	}
 	for index := range element.Children {
-		paint(&element.Children[index], picture, clip, clips)
+		paint(&element.Children[index], picture, clip, clips, scale)
 	}
+}
+
+func scaled(area image.Rectangle, scale float64) image.Rectangle {
+	if scale == 1 {
+		return area
+	}
+	at := func(value int) int { return int(math.Round(float64(value) * scale)) }
+	return image.Rect(at(area.Min.X), at(area.Min.Y), at(area.Max.X), at(area.Max.Y))
+}
+
+// pathRectangles reads a path of axis-aligned subpaths (M, H, V, L and Z, absolute, as pixel art
+// drawn in an editor comes out) as the rectangles that bound each one.
+func pathRectangles(data string) []image.Rectangle {
+	var areas []image.Rectangle
+	var x, y float64
+	var bounds [4]float64
+	open := false
+	finish := func() {
+		if open {
+			areas = append(areas, image.Rect(int(math.Round(bounds[0])), int(math.Round(bounds[1])), int(math.Round(bounds[2])), int(math.Round(bounds[3]))))
+		}
+		open = false
+	}
+	add := func() {
+		if !open {
+			bounds, open = [4]float64{x, y, x, y}, true
+			return
+		}
+		bounds = [4]float64{min(bounds[0], x), min(bounds[1], y), max(bounds[2], x), max(bounds[3], y)}
+	}
+	fields := strings.FieldsFunc(data, func(r rune) bool { return r == ' ' || r == ',' })
+	var tokens []string
+	for _, field := range fields {
+		// commands stick to their numbers: "M80", "40H90"
+		start := 0
+		for index, character := range field {
+			if strings.ContainsRune("MHVLZmhvlz", character) {
+				if index > start {
+					tokens = append(tokens, field[start:index])
+				}
+				tokens = append(tokens, string(character))
+				start = index + 1
+			}
+		}
+		if start < len(field) {
+			tokens = append(tokens, field[start:])
+		}
+	}
+	number := func(index int) float64 {
+		value, _ := strconv.ParseFloat(tokens[index], 64)
+		return value
+	}
+	for index := 0; index < len(tokens); index++ {
+		switch tokens[index] {
+		case "M":
+			finish()
+			x, y = number(index+1), number(index+2)
+			index += 2
+			add()
+		case "L":
+			x, y = number(index+1), number(index+2)
+			index += 2
+			add()
+		case "H":
+			x = number(index + 1)
+			index++
+			add()
+		case "V":
+			y = number(index + 1)
+			index++
+			add()
+		case "Z", "z":
+			finish()
+		}
+	}
+	finish()
+	return areas
 }
 
 // colourOf reads a fill: #rrggbb, a few names, and an opacity from 0 to 1.

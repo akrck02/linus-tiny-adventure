@@ -1,18 +1,23 @@
 # Linu's tiny adventure on the Nintendo 3DS
 
 A port of the game to the 3DS as homebrew, written in Go and built with TinyGo
-([tinygo-3ds](https://github.com/akrck02/tinygo-3ds)), drawn with go-renderer's `ctr` (citro3d)
-and go-ui for the bottom screen.
+([tinygo-3ds](https://github.com/akrck02/tinygo-3ds)), drawn with go-renderer's `ctr` (citro3d).
 
 - **Top screen**: the level, pixel for pixel as the original draws it (16-pixel cells; a level of
   20 × 11 cells fits the 400 × 240 screen whole, the last one scrolls with the player).
-- **Bottom screen**, touched: the level's name, the steps, reset, and the levels to choose.
+- **Loading screen**, as the original's: the title, the tips panel with the heart, the pulsing texts
+  and Linu walking in; the title and level selection start from it.
+- **Bottom screen**, touched or with the buttons: the levels as polaroids (tilted, locked ones dark
+  with a padlock) and the game menu with its polaroids: levels, controls, graphics and sound.
+- **Graphics**: the original's camera filters (none, scanlines, grainy, grayscale, midnight, cozy).
+- **Sound options**: the music and effects sliders.
+- **Particles**: the key's golden sparks and the teleport's purple specks.
 - **Sound**, with [go-sound](https://github.com/akrck02/go-sound): an effect for each push, bump,
   teleport, door and lock, and the radio's music, fainter the farther the player is from it, as
   the original's positional player. The console needs the DSP's firmware, `/3ds/dspfirm.cdc` on the
   SD card; without it the title screen says so and the game plays silent.
-- **Controls**: the cross or the circle pad walk; SELECT starts the level again; Y opens the
-  levels; START goes back to the HOME menu.
+- **Controls**: the cross or the circle pad walk; SELECT starts the level again; START opens the
+  game menu; A chooses and B goes back.
 
 ## How it is made
 
@@ -40,7 +45,7 @@ console's loop. To try every level without playing the ones before:
 ## Not yet
 
 - Progress is not saved between runs (TinyGo has no file system on the 3DS yet).
-- The options screen (graphics filter, sound, controls) and the loading screen.
+- The options are not saved between runs either.
 
 ## AI disclosure
 

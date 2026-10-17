@@ -1,9 +1,10 @@
 //go:build nintendo3ds
 
-// Linu's tiny adventure on the Nintendo 3DS. The top screen is the level, pixel for pixel as the
-// original draws it; the bottom one, touched, holds the level's name, the steps, the reset and the
-// levels to choose. The cross or the circle pad walk, SELECT starts the level again, START goes
-// back to the HOME menu.
+// Linu's tiny adventure on the Nintendo 3DS, as the original: its title, its level selection of
+// polaroids, its loading screen, its levels pixel for pixel, its game menu and options (controls,
+// camera filters, sound), with its particles, sounds and music. The top screen is the game; the
+// bottom one, touched or moved through with the cross, holds the polaroids. The cross or the circle
+// pad walk, SELECT starts the level again, START opens the game menu, the HOME button leaves.
 //
 //	tinygo build -target=nintendo3ds -o linus.3dsx ./cmd/linus
 package main
@@ -16,7 +17,6 @@ import (
 	"github.com/akrck02/go-renderer/draw2d"
 	"github.com/akrck02/go-renderer/input"
 	"github.com/akrck02/go-renderer/opengl/overlay"
-	ui "github.com/akrck02/go-ui"
 
 	"github.com/akrck02/linus-tiny-adventure/3ds/assets"
 	"github.com/akrck02/linus-tiny-adventure/3ds/game"
@@ -45,47 +45,35 @@ func main() {
 		println(err.Error())
 		return
 	}
-	context, err := ui.New()
-	if err != nil {
-		println(err.Error())
-		return
-	}
-	context.Theme = theme()
-	play, err := newPlay()
+	application, err := newApp()
 	if err != nil {
 		println(err.Error())
 		return
 	}
 
-	state := input.NewState()
-	state.FramebufferWidth, state.FramebufferHeight = ctr.BottomWidth, ctr.BottomHeight
-	state.WindowWidth, state.WindowHeight = ctr.BottomWidth, ctr.BottomHeight
 	var controls ctr.Controls
-	var topList draw2d.List
+	state := input.NewState() // kept so the controls tell presses from holds
+	var topList, bottomList draw2d.List
 	last := time.Now()
 	for ctr.Running() {
 		reading := ctr.ReadControls()
 		pressed := controls.Pressed(reading)
-		if pressed&ctr.ButtonStart != 0 {
-			return
-		}
 		controls.Apply(state, reading)
+		state.EndFrame()
 		now := time.Now()
 		seconds := min(now.Sub(last).Seconds(), 0.1)
 		last = now
 
-		play.step(reading, pressed, seconds)
+		application.step(reading, pressed, seconds)
 		topList.Reset()
-		play.drawTop(&topList)
+		application.drawTop(&topList)
+		bottomList.Reset()
+		application.drawBottom(&bottomList)
 
 		ctr.BeginFrame()
 		flat.PaintOn(top, &topList, game.Background)
-		context.Begin(state)
-		play.buildBottom(context)
-		context.End()
-		flat.Paint(context.Drawing(), context.Theme.Background)
+		flat.Paint(&bottomList, game.Background)
 		ctr.EndFrame()
-		state.EndFrame()
 		// TinyGo's scheduler on the console is cooperative, and waiting for the screen happens in
 		// C: yield, so the sound's goroutine fills its buffers
 		runtime.Gosched()

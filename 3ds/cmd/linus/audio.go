@@ -19,11 +19,20 @@ import (
 // level's radio, which sounds fainter the farther the player is from it, as the original's
 // positional player does.
 type audio struct {
-	context *sound.Context
-	effects map[game.Event]*sound.Player
-	music   *sound.Player
-	song    string // the song music plays
-	silent  string // why there is no sound, to say on the title screen; empty when there is
+	context                    *sound.Context
+	effects                    map[game.Event]*sound.Player
+	music                      *sound.Player
+	song                       string  // the song music plays
+	silent                     string  // why there is no sound, to say on the title screen; empty when there is
+	musicVolume, effectsVolume float64 // the sound options' sliders
+}
+
+// setVolumes sets how loud the music and the effects play, from 0 to 1, as the sound options do.
+func (audio *audio) setVolumes(music, effects float64) {
+	audio.musicVolume, audio.effectsVolume = music, effects
+	for event, player := range audio.effects {
+		player.SetVolume(effectSounds[event].volume * effects)
+	}
 }
 
 // sampleRate is the console's: the sounds are converted to it, so nothing is resampled.
@@ -109,7 +118,7 @@ func (audio *audio) follow(world *game.World) {
 	playerX, playerY := world.DrawnAt(world.Player)
 	radioX, radioY := world.DrawnAt(radio)
 	distance := math.Hypot(playerX-radioX, playerY-radioY)
-	audio.music.SetVolume(math.Pow(max(1-distance/radioReach, 0), radioAttenuation))
+	audio.music.SetVolume(audio.musicVolume * math.Pow(max(1-distance/radioReach, 0), radioAttenuation))
 	if !audio.music.IsPlaying() {
 		audio.music.Play()
 	}

@@ -212,7 +212,11 @@ func convertSprites(project, out string) error {
 			return err
 		}
 	}
-	for _, name := range []string{"characters/player.png", "characters/shadow.png", "background/logo.png", "background/press_start.png"} {
+	if err := convertInterface(project, out); err != nil {
+		return err
+	}
+	for _, name := range []string{"characters/player.png", "characters/shadow.png", "background/logo.png", "background/press_start.png",
+		"ui/lock.png", "ui/option_exit.png", "ui/slider_grab.png", "ui/slider_grab_selected.png", "ui/music.png"} {
 		target := strings.ReplaceAll(name, "/", "-")
 		if err := copyFile(filepath.Join(project, "sprites", name), filepath.Join(out, target)); err != nil {
 			return err
@@ -287,6 +291,38 @@ func ffmpeg(from, to string, codec ...string) error {
 	command.Stderr = os.Stderr
 	if err := command.Run(); err != nil {
 		return fmt.Errorf("ffmpeg %s: %w", from, err)
+	}
+	return nil
+}
+
+// convertInterface writes the interface's icons: the menu's four (pixel art on a grid of ten,
+// drawn at a tenth), the camera filters' and the controls'.
+func convertInterface(project, out string) error {
+	icons := filepath.Join(project, "sprites", "ui")
+	for _, name := range []string{"levels", "controls", "graphics", "sound"} {
+		picture, err := rasteriseSVGScaled(filepath.Join(icons, name+".svg"), 0.1)
+		if err != nil {
+			return err
+		}
+		if err := writePNG(filepath.Join(out, "ui-"+name+".png"), picture); err != nil {
+			return err
+		}
+	}
+	for _, folder := range []string{"graphics", "controls/gamepad", "controls/keyboard"} {
+		paths, err := filepath.Glob(filepath.Join(icons, folder, "*.svg"))
+		if err != nil {
+			return err
+		}
+		for _, path := range paths {
+			picture, err := rasteriseSVG(path)
+			if err != nil {
+				return err
+			}
+			name := "ui-" + strings.ReplaceAll(folder, "/", "-") + "-" + strings.TrimSuffix(filepath.Base(path), ".svg")
+			if err := writePNG(filepath.Join(out, name+".png"), picture); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
