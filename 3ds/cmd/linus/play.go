@@ -31,6 +31,7 @@ type play struct {
 	reached  int     // the highest level opened this time the game runs
 	finished float64 // when the last level was finished, to say so for a while; 0 when not
 	clock    float64
+	audio    *audio
 }
 
 func newPlay() (*play, error) {
@@ -50,7 +51,7 @@ func newPlay() (*play, error) {
 	if count, err := strconv.Atoi(unlocked); err == nil {
 		reached = max(1, min(count, len(levels)))
 	}
-	return &play{levels: levels, sprites: sprites, reached: reached}, nil
+	return &play{levels: levels, sprites: sprites, reached: reached, audio: newAudio()}, nil
 }
 
 // unlocked, set at build time, opens levels from the start, to try them:
@@ -75,6 +76,9 @@ const walkThreshold = 0.5
 // step moves the game on: the player walks while a direction is held, as in the original.
 func (play *play) step(reading ctr.Reading, pressed ctr.Buttons, seconds float64) {
 	play.clock += seconds
+	if play.world == nil {
+		play.audio.follow(nil)
+	}
 	switch play.screen {
 	case screenTitle:
 		if pressed&ctr.ButtonA != 0 {
@@ -101,7 +105,8 @@ func (play *play) step(reading ctr.Reading, pressed ctr.Buttons, seconds float64
 	if direction, held := heldDirection(reading); held {
 		world.Move(direction)
 	}
-	world.Events() // sounds, once the console plays them
+	play.audio.play(world.Events())
+	play.audio.follow(world)
 	if world.Complete && !world.Busy() {
 		if world.Level.Number < len(play.levels) {
 			play.open(world.Level.Number + 1)
@@ -195,6 +200,9 @@ func (play *play) titleScreen(context *ui.Context) {
 	}
 	if key(context, "levels", "LEVELS", true) {
 		play.screen = screenLevels
+	}
+	if play.audio.silent != "" {
+		words(context, play.audio.silent, 8)
 	}
 	words(context, "START: HOME MENU", 8)
 }

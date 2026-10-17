@@ -14,6 +14,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -47,6 +48,9 @@ func convert(project, out string) error {
 		return err
 	}
 	if err := convertSprites(project, filepath.Join(out, "sprites")); err != nil {
+		return err
+	}
+	if err := convertSounds(project, filepath.Join(out, "sounds")); err != nil {
 		return err
 	}
 	return copyFile(filepath.Join(project, "fonts", "Early GameBoy.ttf"), filepath.Join(out, "early-gameboy.ttf"))
@@ -85,12 +89,16 @@ var instanced = map[string]string{
 	"laser.tscn": game.KindLaser, "heart.tscn": game.KindHeart, "radio.tscn": game.KindRadio,
 }
 
+// songs are the level being converted's resources, for its radio's song.
+var songs map[string]string
+
 func convertLevel(path string) (game.Level, error) {
 	var level game.Level
 	source, err := readScene(path)
 	if err != nil {
 		return level, err
 	}
+	songs = source.resources
 	for _, item := range source.nodes {
 		x, y := source.position(item)
 		switch {
@@ -142,6 +150,10 @@ func thingOf(item *node, kind string, x, y float64) game.Thing {
 		}
 	case game.KindButton:
 		thing.Colour = strings.Trim(item.properties["color"], `"`)
+	case game.KindRadio:
+		if song := resourcePattern.FindStringSubmatch(item.properties["current_song"]); song != nil {
+			thing.Song = soundName(songs[song[1]])
+		}
 	}
 	thing.X, thing.Y = cell(x), cell(y)
 	return thing
@@ -231,4 +243,50 @@ func copyFile(from, to string) error {
 	defer target.Close()
 	_, err = io.Copy(target, source)
 	return err
+}
+
+// soundName is what a sound is called in the port: its file's name, lower case, words joined by
+// dashes ("res://sounds/effects/box move.mp3" is "box-move").
+func soundName(path string) string {
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	return strings.ReplaceAll(strings.ToLower(name), " ", "-")
+}
+
+// convertSounds turns the MP3s into what go-sound reads, with ffmpeg: the music into Ogg Vorbis
+// (four minutes would be ten megabytes as WAV), the effects into WAV (short, played often:
+// decoding would cost more than the bytes). Mono at 22050 frames a second: the console's speakers
+// and the original's sounds lose nothing that would be heard.
+func convertSounds(project, out string) error {
+	if err := os.MkdirAll(out, 0o755); err != nil {
+		return err
+	}
+	music, err := filepath.Glob(filepath.Join(project, "sounds", "OST", "*.mp3"))
+	if err != nil {
+		return err
+	}
+	for _, path := range music {
+		if err := ffmpeg(path, filepath.Join(out, soundName(path)+".ogg"), "-c:a", "libvorbis", "-q:a", "2"); err != nil {
+			return err
+		}
+	}
+	effects, err := filepath.Glob(filepath.Join(project, "sounds", "effects", "*.mp3"))
+	if err != nil {
+		return err
+	}
+	for _, path := range effects {
+		if err := ffmpeg(path, filepath.Join(out, soundName(path)+".wav"), "-c:a", "pcm_s16le"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ffmpeg(from, to string, codec ...string) error {
+	arguments := append([]string{"-v", "error", "-y", "-i", from, "-ac", "1", "-ar", "22050"}, codec...)
+	command := exec.Command("ffmpeg", append(arguments, to)...)
+	command.Stderr = os.Stderr
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("ffmpeg %s: %w", from, err)
+	}
+	return nil
 }

@@ -507,7 +507,8 @@
 				"kind": "radio",
 				"name": "Radio",
 				"x": 3,
-				"y": 9
+				"y": 9,
+				"song": "level1"
 			},
 			{
 				"kind": "key",
@@ -4518,7 +4519,8 @@
 				"kind": "radio",
 				"name": "Radio",
 				"x": 7,
-				"y": -6
+				"y": -6,
+				"song": "level1"
 			},
 			{
 				"kind": "heart",

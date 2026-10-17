@@ -48,6 +48,7 @@ type Thing struct {
 	Direction string `json:"direction,omitempty"` // a laser's: up, right, down or left
 	Colour    string `json:"colour,omitempty"`    // a button's, as rrggbb
 	Scale     int    `json:"scale,omitempty"`     // a heart drawn larger (the last one)
+	Song      string `json:"song,omitempty"`      // a radio's: the music it plays (assets/sounds)
 }
 
 // Label is a text in the world, in pixels from the scene's origin.

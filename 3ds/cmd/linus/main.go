@@ -9,6 +9,7 @@
 package main
 
 import (
+	"runtime"
 	"time"
 
 	"github.com/akrck02/go-renderer/ctr"
@@ -85,5 +86,8 @@ func main() {
 		flat.Paint(context.Drawing(), context.Theme.Background)
 		ctr.EndFrame()
 		state.EndFrame()
+		// TinyGo's scheduler on the console is cooperative, and waiting for the screen happens in
+		// C: yield, so the sound's goroutine fills its buffers
+		runtime.Gosched()
 	}
 }
