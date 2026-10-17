@@ -3,7 +3,7 @@ package game
 import (
 	"image"
 	"image/color"
-	"math/rand"
+	"math"
 
 	"github.com/akrck02/go-renderer/draw2d"
 )
@@ -76,7 +76,7 @@ func (filter Filter) turnPicture(picture *image.NRGBA) *image.NRGBA {
 }
 
 // Overlay draws the filter's layer over a screen of a size: the grain's speckles (the shader's
-// noise at a fortieth of opacity), the scan lines (a dark line every other row at a tenth), or the
+// noise at its 0.025 of opacity), the scan lines (a dark line every other row at a tenth), or the
 // cozy blue at a tenth. grain is a picture of speckles the size of the largest screen.
 func (filter Filter) Overlay(list *draw2d.List, width, height float32, grain *draw2d.Image) {
 	switch filter {
@@ -93,18 +93,32 @@ func (filter Filter) Overlay(list *draw2d.List, width, height float32, grain *dr
 	}
 }
 
-// NewGrain makes the grain's speckles: each pixel a strong colour of its own, faint, as the grainy
-// shader's sines and tangents of the pixel's place give.
+// NewGrain makes the grain's speckles as the original's grainy shader draws them: each pixel's
+// colour moved by sin(y + x²) in red, sin(x + y²) in green and tan(x + y) in blue, kept between
+// black and white, and laid over the screen at 0.025 of opacity. The shader moves the colour under
+// each pixel; a picture laid over everything cannot know it, so the grain is made over the game's
+// background, which is most of the screen.
 func NewGrain(width, height int) *draw2d.Image {
-	random := rand.New(rand.NewSource(7))
 	picture := image.NewNRGBA(image.Rect(0, 0, width, height))
+	channel := func(base, change float32) uint8 {
+		return uint8(min(max(base+change, 0), 1)*255 + 0.5)
+	}
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
-			picture.SetNRGBA(x, y, color.NRGBA{R: uint8(random.Intn(2) * 255), G: uint8(random.Intn(2) * 255), B: uint8(random.Intn(2) * 255), A: 10})
+			fx, fy := float32(x), float32(y)
+			picture.SetNRGBA(x, y, color.NRGBA{
+				R: channel(Background[0], float32(math.Sin(float64(fy+fx*fx)))),
+				G: channel(Background[1], float32(math.Sin(float64(fx+fy*fy)))),
+				B: channel(Background[2], float32(math.Tan(float64(fy+fx)))),
+				A: grainOpacity,
+			})
 		}
 	}
 	return draw2d.NewImage(picture)
 }
+
+// grainOpacity is the shader's 0.025, in a byte.
+const grainOpacity = 6
 
 // TurnPicture is a picture as a filter turns its colours.
 func TurnPicture(filter Filter, picture *draw2d.Image) *draw2d.Image {
