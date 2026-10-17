@@ -48,7 +48,8 @@ type app struct {
 
 	state   int
 	clock   float64
-	reached int // the highest level opened this run
+	reached int // the highest level opened, kept between runs
+	current int // the level last played
 
 	selected     int     // the level the selector is on, from 0
 	loadingLevel int     // the level the loading screen leads to
@@ -102,13 +103,15 @@ func newApp() (*app, error) {
 	if err != nil {
 		return nil, err
 	}
-	reached := 1
+	// the save and the options, as the original reads them when it starts
+	progress, options := game.ReadProgress(readSave(progressFile)), game.ReadOptions(readSave(optionsFile))
+	reached := min(progress.MaxLevel, len(levels))
 	if count, err := strconv.Atoi(unlocked); err == nil {
-		reached = max(1, min(count, len(levels)))
+		reached = max(reached, min(count, len(levels)))
 	}
 	application := &app{levels: levels, sprites: sprites, fonts: fonts, audio: newAudio(), grain: game.NewGrain(400, 240),
-		reached: reached, music: 0.5, effects: 0.5}
-	application.sprites.SetFilter(game.DefaultFilter)
+		reached: reached, current: min(progress.CurrentLevel, reached), music: options.Music, effects: options.Effects}
+	application.sprites.SetFilter(options.Filter)
 	application.makePictures()
 	application.audio.setVolumes(application.music, application.effects)
 	return application, nil
@@ -118,6 +121,23 @@ func newApp() (*app, error) {
 //
 //	tinygo build -target=nintendo3ds -ldflags="-X main.unlocked=3" -o linus.3dsx ./cmd/linus
 var unlocked string
+
+// The game's two files, as the original's: the save and the options.
+const (
+	progressFile = "save.json"
+	optionsFile  = "options.json"
+)
+
+// saveProgress writes the level last played and the highest reached, as the original does when a
+// level opens.
+func (app *app) saveProgress() {
+	writeSave(progressFile, game.Progress{CurrentLevel: app.current, MaxLevel: app.reached}.Marshal())
+}
+
+// saveOptions writes the filter and the volumes, as the original does when one changes.
+func (app *app) saveOptions() {
+	writeSave(optionsFile, game.Options{Filter: app.sprites.Filter(), Music: app.music, Effects: app.effects}.Marshal())
+}
 
 // makePictures makes the polaroids and the large Linu, through the camera filter in use.
 func (app *app) makePictures() {
@@ -162,8 +182,12 @@ func (app *app) makePictures() {
 
 // setFilter chooses a camera filter, as the graphic options do.
 func (app *app) setFilter(filter game.Filter) {
+	if filter == app.sprites.Filter() {
+		return
+	}
 	app.sprites.SetFilter(filter)
 	app.makePictures()
+	app.saveOptions()
 }
 
 // openLevel shows the loading screen, then the level.
@@ -179,9 +203,14 @@ func (app *app) openLevel(number int) {
 func (app *app) startLevel(number int) {
 	app.world = game.NewWorld(&app.levels[number-1])
 	app.camera.Jump()
+	changed := number != app.current
 	if number > app.reached {
-		app.reached = number
+		app.reached, changed = number, true
 		app.makePictures() // a polaroid unlocked
+	}
+	if changed {
+		app.current = number
+		app.saveProgress()
 	}
 	app.state, app.menu, app.menuFocused, app.focus = stateLevel, menuMain, false, 0
 }
@@ -331,6 +360,10 @@ func volumeOf(app *app, slider int) float64 {
 
 func (app *app) setVolume(slider int, volume float64) {
 	volume = float64(int(volume*100+0.5)) / 100
+	if volume == volumeOf(app, slider) {
+		return
+	}
+	defer app.saveOptions()
 	if slider == 0 {
 		app.music = volume
 	} else {

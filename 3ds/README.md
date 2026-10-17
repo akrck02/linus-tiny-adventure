@@ -11,6 +11,8 @@ A port of the game to the 3DS as homebrew, written in Go and built with TinyGo
   with a padlock) and the game menu with its polaroids: levels, controls, graphics and sound.
 - **Graphics**: the original's camera filters (none, scanlines, grainy, grayscale, midnight, cozy).
 - **Sound options**: the music and effects sliders.
+- **Saving**, as the original: the level last played and the highest reached (`save.json`), and the
+  filter and volumes (`options.json`), in `/3ds/linus-tiny-adventure/` on the SD card.
 - **Particles**: the key's golden sparks and the teleport's purple specks.
 - **Sound**, with [go-sound](https://github.com/akrck02/go-sound): an effect for each push, bump,
   teleport, door and lock, and the radio's music, fainter the farther the player is from it, as
@@ -41,11 +43,6 @@ tinygo build -target=nintendo3ds -o linus.3dsx ./cmd/linus
 buttons and each level's script) and draws a level into a `draw2d` list; `cmd/linus` is the
 console's loop. To try every level without playing the ones before:
 `-ldflags="-X main.unlocked=3"`.
-
-## Not yet
-
-- Progress is not saved between runs (TinyGo has no file system on the 3DS yet).
-- The options are not saved between runs either.
 
 ## AI disclosure
 
