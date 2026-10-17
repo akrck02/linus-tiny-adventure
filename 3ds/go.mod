@@ -4,7 +4,7 @@ go 1.25.6
 
 require (
 	github.com/akrck02/go-renderer v0.0.0
-	github.com/akrck02/go-ui v0.0.0
+	github.com/akrck02/go-ui v0.0.0-20261017114322-990d96da72d6
 )
 
 require (
@@ -13,8 +13,6 @@ require (
 	golang.org/x/text v0.41.0 // indirect
 )
 
-// While the port is made: the local copies of go-renderer's and go-ui's feature/3ds.
-replace (
-	github.com/akrck02/go-renderer => /home/claude/projects/go-3ds-fase0/go-renderer-main
-	github.com/akrck02/go-ui => /home/claude/projects/smart-factory-sim/go-ui
-)
+// go-ui asks for go-renderer v0.0.0 (it builds against a local copy); this is go-renderer's
+// feature/3ds, which has ctr.
+replace github.com/akrck02/go-renderer => github.com/akrck02/go-renderer v0.0.0-20261017114320-1fc015dd62b2
